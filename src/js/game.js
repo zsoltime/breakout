@@ -9,7 +9,7 @@ const padding = 20;
 let paddle;
 let ball;
 let bricks = [];
-const brickSize = {};
+let lastlyPressed;
 
 function setup() {
   const canvas = createCanvas(600, 400);
@@ -17,17 +17,10 @@ function setup() {
   paddle = Paddle();
   ball = Ball();
 
-  // it should be in the Ball factory
-  brickSize.width = width / 10;
-  brickSize.height = Math.ceil((height / 3) / 8);
-
-  for (let i = 0; i < 10; i++) {
-    for (let j = 0; j < 8; j++) {
-      let pos = {
-        x: brickSize.width * i,
-        y: brickSize.height * j
-      }
-      let value = j < 2 ? 7 : j < 4 ? 5 : j < 6 ? 3 : 1;
+  for (let i = 0; i < 8; i++) {
+    for (let j = 0; j < 10; j++) {
+      let pos = { row: i, col: j };
+      let value = i < 2 ? 7 : i < 4 ? 5 : i < 6 ? 3 : 1;
       bricks.push(Brick(pos, value));
     }
   }
@@ -36,17 +29,37 @@ function setup() {
 function draw() {
   clear();
   paddle.render();
+  paddle.update();
   ball.render();
+  ball.update();
 
   for (let i = 0; i < bricks.length; i++) {
     bricks[i].render();
   }
 }
 
-function keyPressed() {}
+function keyPressed() {
+  lastlyPressed = keyCode;
+
+  if (keyCode === LEFT_ARROW) {
+    paddle.move(-1);
+  }
+
+  if (keyCode === RIGHT_ARROW) {
+    paddle.move(1);
+  }
+}
+
+function keyReleased() {
+  if (keyCode === lastlyPressed) {
+    paddle.move(0);
+  }
+}
 
 function Brick(pos, value) {
   let color;
+  let w = width / 10;
+  let h = Math.ceil((height / 3) / 8);
 
   if (value === 1) {
     color = colorYellow;
@@ -63,9 +76,9 @@ function Brick(pos, value) {
 
   function render() {
     stroke(55);
-    strokeWeight(1);
+    strokeWeight(0.25);
     fill(color);
-    rect(pos.x, pos.y, pos.x + brickSize.width, pos.y + brickSize.height);
+    rect(w * pos.col, h * pos.row, w, h);
   }
 
   return {
@@ -78,7 +91,10 @@ function Brick(pos, value) {
 function Ball() {
   let size = 8;
   let pos = createVector(width / 2, height - padding - size / 2);
-  let velocity = createVector(0, 0);
+  let velocity = createVector(random(-2, 2), -1);
+  let speed = 5;
+
+  velocity = velocity.mult(speed);
 
   function render() {
     stroke(255);
@@ -86,11 +102,24 @@ function Ball() {
     point(pos.x, pos.y);
   }
 
-  function move() {}
+  function update() {
+    pos.add(velocity);
+    bounce();
+  }
+
+  function bounce() {
+    if (pos.x <= 0 || pos.x >= width) {
+      velocity.x *= -1;
+    }
+    if (pos.y <= 0 || pos.y >= height) {
+      velocity.y *= -1;
+    }
+  }
 
   return {
     render,
-    move,
+    update,
+    bounce,
     pos
   }
 }
@@ -99,6 +128,7 @@ function Paddle() {
   let size = width / 8;
   let pos = createVector(width / 2, height - padding);
   let velocity = createVector(0, 0);
+  let speed = 7;
 
   function render() {
     stroke(255);
@@ -106,10 +136,18 @@ function Paddle() {
     line(pos.x - size / 2, pos.y, pos.x + size / 2, pos.y);
   }
 
-  function move() {}
+  function update() {
+    pos.x += velocity.x;
+    pos.x = constrain(pos.x, size / 2, width - size / 2);
+  }
+
+  function move(direction) {
+    velocity.x = direction * speed;
+  }
 
   return {
     render,
+    update,
     move,
     pos
   }
