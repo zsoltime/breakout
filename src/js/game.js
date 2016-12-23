@@ -9,7 +9,23 @@ const padding = 20;
 let paddle;
 let ball;
 let bricks = [];
-let lastlyPressed;
+let lives = 3;
+let broken = 0;
+let score = 0;
+let lastlyPressed = 0;
+let hitTop = false;
+const speedIncrease = {
+  available: {
+    hitRed: false,
+    hitOrange: false,
+  },
+  used: {
+    hitRed: false,
+    hitOrange: false,
+    brokenFour: false,
+    brokenTwelve: false
+  }
+}
 
 function setup() {
   const canvas = createCanvas(600, 400);
@@ -18,7 +34,7 @@ function setup() {
   ball = Ball();
 
   for (let i = 0; i < 8; i++) {
-    for (let j = 0; j < 10; j++) {
+    for (let j = 0; j < 14; j++) {
       let pos = { row: i, col: j };
       let value = i < 2 ? 7 : i < 4 ? 5 : i < 6 ? 3 : 1;
       bricks.push(Brick(pos, value));
@@ -33,8 +49,56 @@ function draw() {
   ball.render();
   ball.update();
 
-  for (let i = 0; i < bricks.length; i++) {
+  for (let i = bricks.length - 1; i >= 0; i--) {
     bricks[i].render();
+
+    if (bricks[i].hit(ball)) {
+      broken += 1;
+      score += bricks[i].value;
+
+      if (bricks[i].value === 5) {
+        speedIncrease.available.hitOrange = true;
+      }
+      if (bricks[i].value === 7) {
+        speedIncrease.available.hitRed = true;
+      }
+
+      ball.bounceBack();
+      bricks.splice(i, 1);
+    }
+  }
+
+  // 1, after 4 hits
+  // 2, after 12 hits
+  // 3, after hits first orange
+  // 4, after hits first red
+  if (broken === 4 && !speedIncrease.used.brokenFour) {
+    speedIncrease.used.brokenFour = true;
+    ball.increaseSpeed();
+  }
+
+  if (broken === 12 && !speedIncrease.used.brokenTwelve) {
+    speedIncrease.used.brokenTwelve = true;
+    ball.increaseSpeed();
+  }
+
+  if (speedIncrease.available.hitOrange && !speedIncrease.used.hitOrange) {
+    speedIncrease.used.hitOrange = true;
+    ball.increaseSpeed();
+  }
+
+  if (speedIncrease.available.hitRed && !speedIncrease.used.hitRed) {
+    speedIncrease.used.hitRed = true;
+    ball.increaseSpeed();
+  }
+
+  if (ball.hitTop() && !hitTop) {
+    hitTop = true;
+    paddle.reduceSize();
+  }
+
+  if (paddle.hit(ball)) {
+    ball.bounceBack();
   }
 }
 
@@ -52,14 +116,17 @@ function keyPressed() {
 
 function keyReleased() {
   if (keyCode === lastlyPressed) {
+    lastlyPressed = 0;
     paddle.move(0);
   }
 }
 
 function Brick(pos, value) {
   let color;
-  let w = width / 10;
+  let w = width / 14;
   let h = Math.ceil((height / 3) / 8);
+  let x = w * pos.col;
+  let y = h * pos.row;
 
   if (value === 1) {
     color = colorYellow;
@@ -78,11 +145,16 @@ function Brick(pos, value) {
     stroke(55);
     strokeWeight(0.25);
     fill(color);
-    rect(w * pos.col, h * pos.row, w, h);
+    rect(x, y, w, h);
+  }
+
+  function hit(ball) {
+    return ball.pos.x >= x && ball.pos.x <= x + w && ball.pos.y <= y + h;
   }
 
   return {
     render,
+    hit,
     pos,
     value
   }
@@ -92,7 +164,7 @@ function Ball() {
   let size = 8;
   let pos = createVector(width / 2, height - padding - size / 2);
   let velocity = createVector(random(-2, 2), -1);
-  let speed = 5;
+  let speed = 3;
 
   velocity = velocity.mult(speed);
 
@@ -100,6 +172,10 @@ function Ball() {
     stroke(255);
     strokeWeight(size);
     point(pos.x, pos.y);
+  }
+
+  function bounceBack() {
+    velocity.y *= -1;
   }
 
   function update() {
@@ -116,23 +192,36 @@ function Ball() {
     }
   }
 
+  function increaseSpeed() {
+    velocity = velocity.mult(1.15);
+  }
+
+  function hitTop() {
+    return pos.y <= 0;
+  }
+
   return {
     render,
     update,
     bounce,
-    pos
+    bounceBack,
+    increaseSpeed,
+    hitTop,
+    pos,
+    size
   }
 }
 
 function Paddle() {
-  let size = width / 8;
+  let size = width / 6;
   let pos = createVector(width / 2, height - padding);
   let velocity = createVector(0, 0);
   let speed = 7;
+  let weight = 4;
 
   function render() {
     stroke(255);
-    strokeWeight(4);
+    strokeWeight(weight);
     line(pos.x - size / 2, pos.y, pos.x + size / 2, pos.y);
   }
 
@@ -145,10 +234,21 @@ function Paddle() {
     velocity.x = direction * speed;
   }
 
+  function hit(ball) {
+    return ball.pos.y + ball.size / 2 > pos.y - weight / 2 && Math.abs(ball.pos.x - pos.x) < size / 2;
+  }
+
+  function reduceSize() {
+    size = size / 2;
+  }
+
   return {
     render,
     update,
     move,
-    pos
+    hit,
+    reduceSize,
+    pos,
+    size
   }
 }
