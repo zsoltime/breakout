@@ -5,13 +5,13 @@ const colorRed = '#ff4436';
 const colorOrange = '#ff9800';
 const colorGreen = '#8bc34a';
 const colorYellow = '#ffd740';
+const colorBg = '#d7ccc8';
 const padding = 20;
 let paddle;
 let ball;
+let stats;
 let bricks = [];
-let lives = 3;
 let broken = 0;
-let score = 0;
 let lastlyPressed = 0;
 let hitTop = false;
 const speedIncrease = {
@@ -32,6 +32,7 @@ function setup() {
   canvas.parent(game);
   paddle = Paddle();
   ball = Ball();
+  stats = Stats();
 
   for (let i = 0; i < 8; i++) {
     for (let j = 0; j < 14; j++) {
@@ -43,18 +44,19 @@ function setup() {
 }
 
 function draw() {
-  clear();
+  background(colorBg);
   paddle.render();
   paddle.update();
   ball.render();
   ball.update();
+  stats.render();
 
   for (let i = bricks.length - 1; i >= 0; i--) {
     bricks[i].render();
 
     if (bricks[i].hit(ball)) {
       broken += 1;
-      score += bricks[i].value;
+      stats.addPoints(bricks[i].value);
 
       if (bricks[i].value === 5) {
         speedIncrease.available.hitOrange = true;
@@ -72,6 +74,7 @@ function draw() {
   // 2, after 12 hits
   // 3, after hits first orange
   // 4, after hits first red
+  // TODO: It should be a function :)
   if (broken === 4 && !speedIncrease.used.brokenFour) {
     speedIncrease.used.brokenFour = true;
     ball.increaseSpeed();
@@ -99,6 +102,18 @@ function draw() {
 
   if (paddle.hit(ball)) {
     ball.bounceBack();
+  }
+
+  if (ball.isOffscreen()) {
+    let lives = stats.takeLife();
+    if (lives === 0) {
+      console.log('game over');
+      noLoop();
+    }
+    // set the ball and paddle back to the middle?
+    paddle = Paddle(); // should be half sized if already hit the top!
+    ball = Ball();
+
   }
 }
 
@@ -163,7 +178,7 @@ function Brick(pos, value) {
 function Ball() {
   let size = 8;
   let pos = createVector(width / 2, height - padding - size / 2);
-  let velocity = createVector(random(-2, 2), -1);
+  let velocity = createVector(random(-1, 1), -1);
   let speed = 3;
 
   velocity = velocity.mult(speed);
@@ -187,7 +202,7 @@ function Ball() {
     if (pos.x <= 0 || pos.x >= width) {
       velocity.x *= -1;
     }
-    if (pos.y <= 0 || pos.y >= height) {
+    if (pos.y <= 0) {
       velocity.y *= -1;
     }
   }
@@ -200,6 +215,10 @@ function Ball() {
     return pos.y <= 0;
   }
 
+  function isOffscreen() {
+    return pos.y >= height;
+  }
+
   return {
     render,
     update,
@@ -207,6 +226,7 @@ function Ball() {
     bounceBack,
     increaseSpeed,
     hitTop,
+    isOffscreen,
     pos,
     size
   }
@@ -214,10 +234,10 @@ function Ball() {
 
 function Paddle() {
   let size = width / 6;
-  let pos = createVector(width / 2, height - padding);
+  let weight = 4;
+  let pos = createVector(width / 2, height - weight / 2);
   let velocity = createVector(0, 0);
   let speed = 7;
-  let weight = 4;
 
   function render() {
     stroke(255);
@@ -250,5 +270,32 @@ function Paddle() {
     reduceSize,
     pos,
     size
+  }
+}
+
+function Stats() {
+  let score = 0;
+  let lives = 3;
+
+  function addPoints(points) {
+    score += points;
+  }
+
+  function takeLife() {
+    lives -= 1;
+    return lives;
+  }
+
+  function render() {
+    noStroke();
+    fill(55);
+    text(`Score: ${score}`, padding, height - padding / 2);
+    text(`Balls: ${lives}`, width - padding * 3, height - padding / 2);
+  }
+
+  return {
+    addPoints,
+    takeLife,
+    render
   }
 }
